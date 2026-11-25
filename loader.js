@@ -5,7 +5,31 @@
     try{P=trustedTypes.createPolicy("cpJsonpPolicy",{createScriptURL:u=>u});}catch(e){}
   }
   const su=u=>P?P.createScriptURL(u):u;
-  const rm=id=>{const e=document.getElementById(id);if(e&&e.parentNode)e.parentNode.removeChild(e);};
+
+  let activeKeyHandler=null;
+  const clearKey=()=>{
+    if(activeKeyHandler){
+      window.removeEventListener("keydown",activeKeyHandler,true);
+      document.removeEventListener("keydown",activeKeyHandler,true);
+      activeKeyHandler=null;
+    }
+  };
+  const setKey=fn=>{
+    clearKey();
+    activeKeyHandler=e=>{
+      e.stopPropagation();
+      fn(e);
+    };
+    window.addEventListener("keydown",activeKeyHandler,true);
+    document.addEventListener("keydown",activeKeyHandler,true);
+  };
+
+  const rm=id=>{
+    clearKey();
+    const e=document.getElementById(id);
+    if(e&&e.parentNode)e.parentNode.removeChild(e);
+  };
+
   const ld={
     show(m){
       this.hide();
@@ -21,10 +45,12 @@
     },
     hide(){rm("cpLoadingToast");}
   };
+
   const mod=(t,s,w="380px")=>{
     rm("cpModalOverlay");
     const ov=document.createElement("div");
     ov.id="cpModalOverlay";
+    ov.tabIndex=-1;
     ov.style.cssText="position:fixed;inset:0;z-index:2147483646;background:rgba(15,23,42,.35);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,sans-serif;";
     const c=document.createElement("div");
     c.style.cssText=`width:100%;max-width:${w};background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 20px 45px rgba(15,23,42,.22);max-height:85vh;display:flex;flex-direction:column;gap:8px;overflow-y:auto;`;
@@ -42,6 +68,35 @@
     document.documentElement.appendChild(ov);
     return{ov,c};
   };
+
+  const bindListKeys=(btns,onCancel,onPick)=>{
+    let idx=0;
+    const paint=()=>{
+      btns.forEach((b,i)=>{
+        const active=i===idx;
+        b.style.borderColor=active?"#2563eb":"#cbd5e1";
+        b.style.background=active?"#eff6ff":"#f8fafc";
+        b.style.outline=active?"2px solid rgba(37,99,235,.25)":"none";
+      });
+      if(btns[idx])btns[idx].focus({preventScroll:true});
+    };
+    btns.forEach((b,i)=>{
+      b.addEventListener("mouseenter",()=>{idx=i;paint();});
+      b.addEventListener("focus",()=>{idx=i;paint();});
+    });
+    paint();
+    setKey(e=>{
+      if(e.key==="Escape"){e.preventDefault();rm("cpModalOverlay");onCancel();}
+      else if(e.key==="ArrowDown"){e.preventDefault();idx=(idx+1)%btns.length;paint();}
+      else if(e.key==="ArrowUp"){e.preventDefault();idx=(idx-1+btns.length)%btns.length;paint();}
+      else if(e.key==="Enter"){e.preventDefault();if(btns[idx]){const k=idx;rm("cpModalOverlay");onPick(k);}}
+      else if(/^[1-9]$/.test(e.key)){
+        const n=parseInt(e.key,10)-1;
+        if(n>=0&&n<btns.length){e.preventDefault();rm("cpModalOverlay");onPick(n);}
+      }
+    });
+  };
+
   const cpUI={
     aviso:(m,t="Aviso")=>new Promise(r=>{
       const{c}=mod(t,m,"360px");
@@ -49,8 +104,13 @@
       b.type="button";
       b.style.cssText="align-self:flex-end;margin-top:8px;padding:8px 16px;border-radius:9px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;";
       b.textContent="Aceptar";
-      b.onclick=()=>{rm("cpModalOverlay");r(1);};
+      const done=()=>{rm("cpModalOverlay");r(1);};
+      b.onclick=done;
       c.appendChild(b);
+      setTimeout(()=>b.focus({preventScroll:true}),15);
+      setKey(e=>{
+        if(e.key==="Enter"||e.key==="Escape"){e.preventDefault();done();}
+      });
     }),
     confirmar:(m,t="Confirmar")=>new Promise(r=>{
       const{c}=mod(t,m,"380px");
@@ -58,16 +118,23 @@
       f.style.cssText="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;";
       const no=document.createElement("button");
       no.type="button";
-      no.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;font-size:13px;font-weight:600;";
+      no.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;";
       no.textContent="Cancelar";
-      no.onclick=()=>{rm("cpModalOverlay");r(0);};
       const si=document.createElement("button");
       si.type="button";
-      si.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:13px;font-weight:600;";
+      si.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;";
       si.textContent="Aceptar";
-      si.onclick=()=>{rm("cpModalOverlay");r(1);};
+      const cancel=()=>{rm("cpModalOverlay");r(0);};
+      const accept=()=>{rm("cpModalOverlay");r(1);};
+      no.onclick=cancel;
+      si.onclick=accept;
       f.append(no,si);
       c.appendChild(f);
+      setTimeout(()=>si.focus({preventScroll:true}),15);
+      setKey(e=>{
+        if(e.key==="Escape"){e.preventDefault();cancel();}
+        else if(e.key==="Enter"){e.preventDefault();accept();}
+      });
     }),
     texto:(m,v="",t="Ingresar dato")=>new Promise(r=>{
       const{c}=mod(t,m,"380px");
@@ -79,20 +146,30 @@
       f.style.cssText="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;";
       const no=document.createElement("button");
       no.type="button";
-      no.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;font-size:13px;font-weight:600;";
+      no.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;";
       no.textContent="Cancelar";
-      no.onclick=()=>{rm("cpModalOverlay");r(null);};
       const ok=document.createElement("button");
       ok.type="button";
-      ok.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:13px;font-weight:600;";
+      ok.style.cssText="padding:8px 14px;border-radius:9px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;";
       ok.textContent="Aceptar";
-      ok.onclick=()=>{rm("cpModalOverlay");r(i.value.trim());};
+      const cancel=()=>{rm("cpModalOverlay");r(null);};
+      const submit=()=>{const val=i.value.trim();rm("cpModalOverlay");r(val);};
+      no.onclick=cancel;
+      ok.onclick=submit;
       f.append(no,ok);
       c.append(i,f);
-      setTimeout(()=>{i.focus();i.select();},10);
+      setTimeout(()=>{
+        i.focus({preventScroll:true});
+        i.select();
+      },20);
+      setKey(e=>{
+        if(e.key==="Escape"){e.preventDefault();cancel();}
+        else if(e.key==="Enter"&&document.activeElement!==no){e.preventDefault();submit();}
+      });
     }),
     elegir:(ops,t="Selecciona una opción",s="")=>new Promise(r=>{
       const{c}=mod(t,s,"410px");
+      const btns=[];
       ops.forEach((o,i)=>{
         const b=document.createElement("button");
         b.type="button";
@@ -100,6 +177,7 @@
         b.textContent=(o.key||i+1)+". "+o.label;
         b.onclick=()=>{rm("cpModalOverlay");r(o);};
         c.appendChild(b);
+        btns.push(b);
       });
       const x=document.createElement("button");
       x.type="button";
@@ -107,11 +185,14 @@
       x.textContent="Cancelar";
       x.onclick=()=>{rm("cpModalOverlay");r(null);};
       c.appendChild(x);
+      bindListKeys(btns,()=>r(null),idx=>r(ops[idx]));
     })
   };
   window.cpUI=cpUI;
+
   const menu=(d,out)=>new Promise(r=>{
     const{c}=mod("👤 "+(d.usuario||"Usuario"),"Vigencia: "+(d.vence||"Sin límite"),"360px");
+    const btns=[];
     d.modulos.forEach((m,i)=>{
       const b=document.createElement("button");
       b.type="button";
@@ -119,22 +200,25 @@
       b.textContent=(i+1)+". "+m.nombre;
       b.onclick=()=>{rm("cpModalOverlay");r(m);};
       c.appendChild(b);
+      btns.push(b);
     });
     const f=document.createElement("div");
     f.style.cssText="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;";
     const lo=document.createElement("button");
     lo.type="button";
-    lo.style.cssText="background:none;border:none;color:#dc2626;font-weight:600;";
+    lo.style.cssText="background:none;border:none;color:#dc2626;font-weight:600;cursor:pointer;";
     lo.textContent="🔒 Cambiar clave";
     lo.onclick=()=>{rm("cpModalOverlay");r(null);out();};
     const cl=document.createElement("button");
     cl.type="button";
-    cl.style.cssText="background:none;border:none;color:#64748b;font-weight:600;";
+    cl.style.cssText="background:none;border:none;color:#64748b;font-weight:600;cursor:pointer;";
     cl.textContent="Cerrar";
     cl.onclick=()=>{rm("cpModalOverlay");r(null);};
     f.append(lo,cl);
     c.appendChild(f);
+    bindListKeys(btns,()=>r(null),idx=>r(d.modulos[idx]));
   });
+
   const pedir=async p=>{
     const q=new URLSearchParams(p).toString(),url=U+(U.includes("?")?"&":"?")+q;
     try{
@@ -156,6 +240,7 @@
       });
     }
   };
+
   (async()=>{
     try{
       let k=localStorage.getItem("cp_suite_key")||"";
