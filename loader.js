@@ -11,8 +11,12 @@
       this.hide();
       const d=document.createElement("div");
       d.id="cpLoadingToast";
-      d.style.cssText="position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;color:#0f172a;padding:10px 14px;border-radius:10px;font:600 13px system-ui,sans-serif;box-shadow:0 10px 25px rgba(15,23,42,.16);border:1px solid #cbd5e1;pointer-events:none;";
-      d.textContent=m||"Cargando...";
+      d.style.cssText="position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;color:#0f172a;padding:10px 14px;border-radius:10px;font:600 13px system-ui,sans-serif;box-shadow:0 10px 25px rgba(15,23,42,.16);border:1px solid #cbd5e1;display:flex;align-items:center;gap:10px;pointer-events:none;";
+      const dot=document.createElement("span");
+      dot.style.cssText="width:10px;height:10px;border-radius:999px;background:#2563eb;display:inline-block;flex-shrink:0;";
+      const txt=document.createElement("span");
+      txt.textContent=m||"Cargando...";
+      d.append(dot,txt);
       document.documentElement.appendChild(d);
     },
     hide(){rm("cpLoadingToast");}
@@ -111,70 +115,4 @@
     d.modulos.forEach((m,i)=>{
       const b=document.createElement("button");
       b.type="button";
-      b.style.cssText="width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;";
-      b.textContent=(i+1)+". "+m.nombre;
-      b.onclick=()=>{rm("cpModalOverlay");r(m);};
-      c.appendChild(b);
-    });
-    const f=document.createElement("div");
-    f.style.cssText="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;";
-    const lo=document.createElement("button");
-    lo.type="button";
-    lo.style.cssText="background:none;border:none;color:#dc2626;font-weight:600;";
-    lo.textContent="🔒 Cambiar clave";
-    lo.onclick=()=>{rm("cpModalOverlay");r(null);out();};
-    const cl=document.createElement("button");
-    cl.type="button";
-    cl.style.cssText="background:none;border:none;color:#64748b;font-weight:600;";
-    cl.textContent="Cerrar";
-    cl.onclick=()=>{rm("cpModalOverlay");r(null);};
-    f.append(lo,cl);
-    c.appendChild(f);
-  });
-  const pedir=async p=>{
-    const q=new URLSearchParams(p).toString(),url=U+(U.includes("?")?"&":"?")+q;
-    try{
-      const res=await fetch(url,{method:"GET",mode:"cors",credentials:"omit",redirect:"follow"});
-      if(!res.ok)throw new Error("HTTP "+res.status);
-      const txt=await res.text();
-      return JSON.parse(txt.replace(/^[a-zA-Z0-9_$]+\(/,"").replace(/\);?\s*$/,""));
-    }catch(e1){
-      return new Promise((res,rej)=>{
-        const cb="cpCb_"+Date.now()+"_"+Math.floor(Math.random()*1e6);
-        const tm=setTimeout(()=>{cln();rej(new Error("Fallo red: "+(e1&&e1.message||"Timeout")));},15000);
-        const cln=()=>{clearTimeout(tm);delete window[cb];rm(cb);};
-        window[cb]=d=>{cln();res(d);};
-        const s=document.createElement("script");
-        s.id=cb;
-        s.src=su(url+"&callback="+cb);
-        s.onerror=()=>{cln();rej(new Error("Bloqueo navegador: "+(e1&&e1.message||"onerror")));};
-        document.documentElement.appendChild(s);
-      });
-    }
-  };
-  (async()=>{
-    try{
-      let k=localStorage.getItem("cp_suite_key")||"";
-      if(!k){k=await cpUI.texto("Ingresa tu clave de acceso:","","Acceso al sistema");if(!k)return;localStorage.setItem("cp_suite_key",k);}
-      let did=localStorage.getItem("cp_device_id")||"";
-      if(!did){did=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"dev_"+Date.now();localStorage.setItem("cp_device_id",did);}
-      ld.show("Validando clave y cargando menú...");
-      const d=await pedir({accion:"menu",clave:k,deviceId:did});
-      ld.hide();
-      if(!d||!d.ok){localStorage.removeItem("cp_suite_key");await cpUI.aviso((d&&d.error)||"Error de acceso","⚠️ Acceso denegado");return;}
-      if(!d.modulos||!d.modulos.length){await cpUI.aviso("No tienes módulos habilitados.","⚠️ Sin módulos");return;}
-      const el=await menu(d,async()=>{localStorage.removeItem("cp_suite_key");await cpUI.aviso("Sesión cerrada.","✅ Sesión cerrada");});
-      if(!el)return;
-      ld.show("Cargando módulo "+el.nombre+"...");
-      const ex=await pedir({accion:"ejecutar",clave:k,modulo:el.id,deviceId:did});
-      ld.hide();
-      if(!ex||!ex.ok){await cpUI.aviso((ex&&ex.error)||"Error al cargar módulo","⚠️ Error de módulo");return;}
-      const AF=Object.getPrototypeOf(async function(){}).constructor;
-      await new AF(ex.codigo)();
-    }catch(e){
-      await cpUI.aviso(e.message,"⚠️ Error");
-    }finally{
-      ld.hide();
-    }
-  })();
-})();
+      b.style.cssText="width:100%;text-align:left;padding:10px 12px;border
